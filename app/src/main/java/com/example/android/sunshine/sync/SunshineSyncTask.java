@@ -18,17 +18,35 @@ package com.example.android.sunshine.sync;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.IntentSender;
+import android.os.Bundle;
 import android.text.format.DateUtils;
+import android.util.Log;
 
 import com.example.android.sunshine.data.SunshinePreferences;
 import com.example.android.sunshine.data.WeatherContract;
 import com.example.android.sunshine.utilities.NetworkUtils;
 import com.example.android.sunshine.utilities.NotificationUtils;
 import com.example.android.sunshine.utilities.OpenWeatherJsonUtils;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
+import com.google.android.gms.wearable.Wearable;
 
 import java.net.URL;
 
-public class SunshineSyncTask {
+import static android.webkit.ConsoleMessage.MessageLevel.LOG;
+
+public class SunshineSyncTask implements
+        DataApi.DataListener,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener{
 
     /**
      * Performs the network request for updated weather, parses the JSON from that request, and
@@ -38,7 +56,52 @@ public class SunshineSyncTask {
      *
      * @param context Used to access utility methods and the ContentResolver
      */
-    synchronized public static void syncWeather(Context context) {
+
+    private static final String TEMP = "com.example.android.sunshine.key.temp";
+    private static final String TAG = "Sync Task";
+    private static final int REQUEST_RESOLVE_ERROR = 1000;
+    private boolean mResolvingError = false;
+    private GoogleApiClient mGoogleApiClient;
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Log.d(TAG, "onConnected");
+        mResolvingError = false;
+        Wearable.DataApi.addListener(mGoogleApiClient, this);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.d(TAG, "onConnectionSuspended");
+
+    }
+
+    @Override
+    public void onDataChanged(DataEventBuffer dataEventBuffer) {
+        Log.d(TAG, "onDataChanged");
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        Log.d(TAG, "onConnectionFailed");
+        if (!mResolvingError) {
+            if (connectionResult.hasResolution()) {
+                try {
+                    mResolvingError = true;
+                    connectionResult.startResolutionForResult(this, REQUEST_RESOLVE_ERROR);
+                } catch (IntentSender.SendIntentException e) {
+                    // There was an error with the resolution intent. Try again.
+                    mGoogleApiClient.connect();
+                }
+            } else {
+                Log.e(TAG, "Connection to Google API client has failed");
+                mResolvingError = false;
+                Wearable.DataApi.removeListener(mGoogleApiClient, this);
+            }
+        }
+    }
+
+    synchronized static public void syncWeather(Context context) {
 
         try {
             /*
@@ -54,6 +117,8 @@ public class SunshineSyncTask {
             /* Parse the JSON into a list of weather values */
             ContentValues[] weatherValues = OpenWeatherJsonUtils
                     .getWeatherContentValuesFromJson(context, jsonWeatherResponse);
+
+            Integer max_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP);
 
             /*
              * In cases where our JSON contained an error code, getWeatherContentValuesFromJson
@@ -105,6 +170,26 @@ public class SunshineSyncTask {
                 }
 
             /* If the code reaches this point, we have successfully performed our sync */
+                mGoogleApiClient = new GoogleApiClient.Builder(context)
+                        .addApi(Wearable.API)
+                        .addConnectionCallbacks((ConnectionCallbacks) context)
+                        .addOnConnectionFailedListener((GoogleApiClient.OnConnectionFailedListener) context)
+                        .build();
+                if (!mResolvingError) {
+                    mGoogleApiClient.connect();
+                }
+
+                PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/max_temp");
+                putDataMapReq.getDataMap().putInt(TEMP, max_temp);
+                PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+                Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
+                        .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                            @Override
+                            public void onResult(DataApi.DataItemResult dataItemResult) {
+                                Log.d(TAG, "Sending image was successful: " + dataItemResult.getStatus()
+                                        .isSuccess());
+                            }
+                        });
 
             }
 
