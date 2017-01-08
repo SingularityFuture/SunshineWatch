@@ -54,7 +54,7 @@ public class SunshineSyncTask implements
      * @param context Used to access utility methods and the ContentResolver
      */
 
-    private static final String TEMP = "com.example.android.sunshine.key.temp";
+    private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
     private static final String TAG = "Sync Task";
     private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static boolean mResolvingError = false;
@@ -185,7 +185,7 @@ public class SunshineSyncTask implements
                 }
 
                 PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/max_temp");
-                putDataMapReq.getDataMap().putInt(TEMP, max_temp);
+                putDataMapReq.getDataMap().putInt(MAX_TEMP, max_temp);
                 PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
                 Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
                         .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {

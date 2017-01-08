@@ -26,10 +26,22 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.Nullable;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
+import android.util.Log;
 import android.view.SurfaceHolder;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
 
 import java.lang.ref.WeakReference;
 import java.util.Calendar;
@@ -53,6 +65,9 @@ public class MyWatchFace extends CanvasWatchFaceService {
      * Handler message id for updating the time periodically in interactive mode.
      */
     private static final int MSG_UPDATE_TIME = 0;
+    private static final String TAG = "Watch Face Canvas";
+    private static final int REQUEST_RESOLVE_ERROR = 1000;
+    private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
 
     @Override
     public Engine onCreateEngine() {
@@ -79,7 +94,10 @@ public class MyWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine {
+    private class Engine extends CanvasWatchFaceService.Engine implements
+            DataApi.DataListener,
+            GoogleApiClient.ConnectionCallbacks,
+            GoogleApiClient.OnConnectionFailedListener{
 
         private final Rect mPeekCardBounds = new Rect();
         /* Handler to update the time once a second in interactive mode. */
@@ -103,6 +121,61 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
         private boolean mAmbient;
 
+        private GoogleApiClient mGoogleApiClient;
+        private boolean mResolvingError;
+        private int max_temp=33;
+
+        @Override
+        public void onConnected(@Nullable Bundle bundle) {
+            mResolvingError = false;
+            Wearable.DataApi.addListener(mGoogleApiClient, this);
+        }
+
+        @Override
+        public void onConnectionSuspended(int i) {
+            Log.d(TAG, "onConnectionSuspended");
+            Wearable.DataApi.removeListener(mGoogleApiClient, this);
+            mGoogleApiClient.disconnect();
+        }
+
+        @Override
+        public void onDataChanged(DataEventBuffer dataEvents) {
+            Log.d(TAG, "onDataChanged");
+            for (DataEvent event : dataEvents) {
+                if (event.getType() == DataEvent.TYPE_CHANGED) {
+                    // DataItem changed
+                    DataItem item = event.getDataItem();
+                    if (item.getUri().getPath().compareTo("/max_temp") == 0) {
+                        DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
+                        max_temp = dataMap.getInt(MAX_TEMP);
+                        invalidate();
+                    }
+                } else if (event.getType() == DataEvent.TYPE_DELETED) {
+                    // DataItem deleted
+                }
+            }
+        }
+
+        @Override
+        public void onConnectionFailed(ConnectionResult connectionResult) {
+            Log.d(TAG, "onConnectionFailed");
+            if (!mResolvingError) {
+                if (connectionResult.hasResolution()) {
+/*                try {
+                    mResolvingError = true;
+                    //connectionResult.startResolutionForResult(this, REQUEST_RESOLVE_ERROR);
+                } catch (IntentSender.SendIntentException e) {
+                    // There was an error with the resolution intent. Try again.
+                    mGoogleApiClient.connect();
+                }*/
+                } else {
+                    Log.e(TAG, "Connection to Google API client has failed");
+                    mResolvingError = false;
+                    //Wearable.DataApi.removeListener(mGoogleApiClient, this);
+                }
+            }
+        }
+
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);        // Create the Paint for later use
@@ -120,6 +193,13 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .setShowSystemUiTime(true)
                     .setAcceptsTapEvents(true)
                     .build());
+
+            mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+                    .addApi(Wearable.API)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .build();
+            mGoogleApiClient.connect();
 
 /*            mHourPaint.setAntiAlias(true);
             mHourPaint.setShadowLayer(SHADOW_RADIUS, 0, 0, mWatchHandShadowColor);*/
@@ -152,20 +232,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
         public void onAmbientModeChanged(boolean inAmbientMode) {
             super.onAmbientModeChanged(inAmbientMode);
             mAmbient = inAmbientMode;
-
-            updateWatchHandStyle();
-
             /* Check and trigger whether or not timer should be running (only in active mode). */
             //updateTimer();
-        }
-
-        private void updateWatchHandStyle() {
-            if (mAmbient) {
-
-
-            } else {
-
-            }
         }
 
 /*        @Override
@@ -227,7 +295,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
             mCalendar.setTimeInMillis(now);*/
 
             //canvas.drawColor(Color.BLUE);
-            canvas.drawText("12:00",
+            canvas.drawText(Integer.toString(max_temp),
                     bounds.centerX() - mTextXOffset,
                     bounds.centerY() - mTextYOffset,
                     mTextPaint);
@@ -245,22 +313,20 @@ public class MyWatchFace extends CanvasWatchFaceService {
             canvas.restore();*/
         }
 
-/*        @Override
+        @Override
         public void onVisibilityChanged(boolean visible) {
             super.onVisibilityChanged(visible);
 
             if (visible) {
-                registerReceiver();
-                *//* Update time zone in case it changed while we weren't visible. *//*
-                mCalendar.setTimeZone(TimeZone.getDefault());
+                mGoogleApiClient.connect();
                 invalidate();
             } else {
-                unregisterReceiver();
+                if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+                    Wearable.DataApi.removeListener(mGoogleApiClient, this);
+                    mGoogleApiClient.disconnect();
+                }
             }
-
-            *//* Check and trigger whether or not timer should be running (only in active mode). *//*
-            updateTimer();
-        }*/
+        }
 
 /*        @Override
         public void onPeekCardPositionUpdate(Rect rect) {
