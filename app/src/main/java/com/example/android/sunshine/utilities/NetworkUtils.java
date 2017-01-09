@@ -19,6 +19,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
 
+import com.example.android.sunshine.BuildConfig;
 import com.example.android.sunshine.data.SunshinePreferences;
 
 import java.io.IOException;
@@ -49,12 +50,14 @@ public final class NetworkUtils {
      * you can do so by setting the FORECAST_BASE_URL to STATIC_WEATHER_URL below.
      */
     private static final String DYNAMIC_WEATHER_URL =
-            "https://andfun-weather.udacity.com/weather";
+            "http://api.openweathermap.org/data/2.5/forecast/daily";
+            //"https://andfun-weather.udacity.com/weather";
 
     private static final String STATIC_WEATHER_URL =
-            "https://andfun-weather.udacity.com/staticweather";
+            "http://api.openweathermap.org/data/2.5/forecast/daily";
+            //"https://andfun-weather.udacity.com/staticweather";
 
-    private static final String FORECAST_BASE_URL = STATIC_WEATHER_URL;
+    private static final String FORECAST_BASE_URL = DYNAMIC_WEATHER_URL;
 
     /*
      * NOTE: These values only effect responses from OpenWeatherMap, NOT from the fake weather
@@ -82,6 +85,7 @@ public final class NetworkUtils {
     private static final String UNITS_PARAM = "units";
     /* The days parameter allows us to designate how many days of weather data we want */
     private static final String DAYS_PARAM = "cnt";
+    private static final String APPID ="appid";
 
     /**
      * Retrieves the proper URL to query for the weather data. The reason for both this method as
@@ -124,6 +128,7 @@ public final class NetworkUtils {
                 .appendQueryParameter(FORMAT_PARAM, format)
                 .appendQueryParameter(UNITS_PARAM, units)
                 .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
+                .appendQueryParameter(APPID, BuildConfig.OPEN_WEATHER_MAP_API_KEY)
                 .build();
 
         try {
@@ -149,6 +154,7 @@ public final class NetworkUtils {
                 .appendQueryParameter(FORMAT_PARAM, format)
                 .appendQueryParameter(UNITS_PARAM, units)
                 .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
+                .appendQueryParameter(APPID, BuildConfig.OPEN_WEATHER_MAP_API_KEY)
                 .build();
 
         try {

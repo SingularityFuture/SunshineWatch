@@ -295,16 +295,15 @@ public class MyWatchFace extends CanvasWatchFaceService {
             mCalendar.setTimeInMillis(now);*/
 
             //canvas.drawColor(Color.BLUE);
-            canvas.drawText(Integer.toString(max_temp),
-                    bounds.centerX() - mTextXOffset,
-                    bounds.centerY() - mTextYOffset,
-                    mTextPaint);
-
 
             if (mAmbient) {
                 canvas.drawColor(Color.BLACK);
             } else {
                 canvas.drawColor(Color.BLUE);
+                canvas.drawText(Integer.toString(max_temp),
+                        bounds.centerX() - mTextXOffset,
+                        bounds.centerY() - mTextYOffset,
+                        mTextPaint);
             }
 
 /*            canvas.save();

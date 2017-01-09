@@ -55,6 +55,7 @@ public class SunshineSyncTask {
      */
 
     private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
+    private static final String CURRENT_TIME= "com.example.android.sunshine.key.max_temp";
     private static final String TAG = "Sync Task";
     //private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static boolean mResolvingError = false;
@@ -172,12 +173,14 @@ public class SunshineSyncTask {
 
                 PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/max_temp");
                 putDataMapReq.getDataMap().putInt(MAX_TEMP, max_temp);
+                putDataMapReq.getDataMap().putLong(CURRENT_TIME, System.currentTimeMillis());
                 PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+                putDataReq.setUrgent();
                 Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
                         .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
                             @Override
                             public void onResult(DataApi.DataItemResult dataItemResult) {
-                                Log.d(TAG, "Sending image was successful: " + dataItemResult.getStatus()
+                                Log.d(TAG, "Sending data was successful: " + dataItemResult.getStatus()
                                         .isSuccess());
                             }
                         });

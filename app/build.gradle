@@ -17,6 +17,9 @@ android {
             minifyEnabled false
         }
     }
+    buildTypes.each {
+        it.buildConfigField 'String', 'OPEN_WEATHER_MAP_API_KEY', Open_Weather_Key
+    }
 
     dataBinding.enabled = true
 }
