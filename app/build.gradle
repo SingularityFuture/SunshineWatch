@@ -5,7 +5,7 @@ android {
     buildToolsVersion '25.0.1'
 
     defaultConfig {
-        applicationId "com.example.android.sunshine"
+        applicationId "com.example.sunshinewatch"
         minSdkVersion 10
         targetSdkVersion 25
         versionCode 1
@@ -40,5 +40,5 @@ dependencies {
     androidTestCompile 'com.android.support.test:rules:0.5'
 
     wearApp project(':sunshinewatch')
-    compile 'com.google.android.gms:play-services-wearable:10.0.1'
+    compile 'com.google.android.gms:play-services-wearable:9.2.0'
 }
