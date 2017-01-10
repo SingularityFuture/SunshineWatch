@@ -55,7 +55,8 @@ public class SunshineSyncTask {
      */
 
     private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
-    private static final String CURRENT_TIME= "com.example.android.sunshine.key.max_temp";
+    private static final String MIN_TEMP = "com.example.android.sunshine.key.min_temp";
+    private static final String CURRENT_TIME= "com.example.android.sunshine.key.time";
     private static final String TAG = "Sync Task";
     //private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static boolean mResolvingError = false;
@@ -78,7 +79,18 @@ public class SunshineSyncTask {
             ContentValues[] weatherValues = OpenWeatherJsonUtils
                     .getWeatherContentValuesFromJson(context, jsonWeatherResponse);
 
-            Integer max_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP);
+            double max_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP);
+            double min_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MIN_TEMP);
+            double max_temp_correct_units;
+            double min_temp_correct_units;
+            if (!SunshinePreferences.isMetric(context)) {
+                max_temp_correct_units= (max_temp * 1.8) + 32;
+                min_temp_correct_units= (min_temp * 1.8) + 32;
+            }
+            else {
+                max_temp_correct_units=max_temp;
+                min_temp_correct_units=min_temp;
+            }
 
             /*
              * In cases where our JSON contained an error code, getWeatherContentValuesFromJson
@@ -171,8 +183,9 @@ public class SunshineSyncTask {
                     mGoogleApiClient.connect();
                 }
 
-                PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/max_temp");
-                putDataMapReq.getDataMap().putInt(MAX_TEMP, max_temp);
+                PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/weather_info");
+                putDataMapReq.getDataMap().putInt(MAX_TEMP, (int) max_temp_correct_units);
+                putDataMapReq.getDataMap().putInt(MIN_TEMP, (int) min_temp_correct_units);
                 putDataMapReq.getDataMap().putLong(CURRENT_TIME, System.currentTimeMillis());
                 PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
                 putDataReq.setUrgent();

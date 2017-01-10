@@ -68,6 +68,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
     private static final String TAG = "Watch Face Canvas";
     private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
+    private static final String MIN_TEMP = "com.example.android.sunshine.key.min_temp";
 
     @Override
     public Engine onCreateEngine() {
@@ -123,7 +124,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
         private GoogleApiClient mGoogleApiClient;
         private boolean mResolvingError;
-        private int max_temp=33;
+        private int max_temp;
+        private int min_temp;
 
         @Override
         public void onConnected(@Nullable Bundle bundle) {
@@ -145,9 +147,10 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 if (event.getType() == DataEvent.TYPE_CHANGED) {
                     // DataItem changed
                     DataItem item = event.getDataItem();
-                    if (item.getUri().getPath().compareTo("/max_temp") == 0) {
+                    if (item.getUri().getPath().compareTo("/weather_info") == 0) {
                         DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
                         max_temp = dataMap.getInt(MAX_TEMP);
+                        min_temp = dataMap.getInt(MIN_TEMP);
                         invalidate();
                     }
                 } else if (event.getType() == DataEvent.TYPE_DELETED) {
@@ -300,7 +303,9 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 canvas.drawColor(Color.BLACK);
             } else {
                 canvas.drawColor(Color.BLUE);
-                canvas.drawText(Integer.toString(max_temp),
+                String max_temp_string= Integer.toString(max_temp);
+                String min_temp_string= Integer.toString(min_temp);
+                canvas.drawText(max_temp_string+(char) 0x00B0+" "+min_temp_string+(char) 0x00B0,
                         bounds.centerX() - mTextXOffset,
                         bounds.centerY() - mTextYOffset,
                         mTextPaint);
