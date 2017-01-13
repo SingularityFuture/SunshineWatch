@@ -23,28 +23,35 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.wearable.watchface.CanvasWatchFaceService;
-import android.support.wearable.watchface.WatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.Random;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -69,6 +76,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
     private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static final String MAX_TEMP = "com.example.android.sunshine.key.max_temp";
     private static final String MIN_TEMP = "com.example.android.sunshine.key.min_temp";
+    private static final String WEATHER_ID = "com.example.android.sunshine.key.weather_id";
+    private static final String INSTALLED = "com.example.android.sunshine.key.installed";
 
     @Override
     public Engine onCreateEngine() {
@@ -117,7 +126,10 @@ public class MyWatchFace extends CanvasWatchFaceService {
         private float mCenterY;
 
         Paint mTextPaint;
+        Paint mTextPaintThin;
+        Paint mTextPaintDate;
         float mTextXOffset;
+        float mTextXOffsetDate;
         float mTextYOffset;
 
         private boolean mAmbient;
@@ -126,6 +138,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
         private boolean mResolvingError;
         private int max_temp;
         private int min_temp;
+        private int weather_id;
+        private int weather_icon= R.drawable.ic_clear; // Set default to clear.
 
         @Override
         public void onConnected(@Nullable Bundle bundle) {
@@ -151,6 +165,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
                         DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
                         max_temp = dataMap.getInt(MAX_TEMP);
                         min_temp = dataMap.getInt(MIN_TEMP);
+                        weather_id = dataMap.getInt(WEATHER_ID);
+                        weather_icon = getSmallArtResourceIdForWeatherCondition(weather_id);
                         invalidate();
                     }
                 } else if (event.getType() == DataEvent.TYPE_DELETED) {
@@ -164,13 +180,6 @@ public class MyWatchFace extends CanvasWatchFaceService {
             Log.d(TAG, "onConnectionFailed");
             if (!mResolvingError) {
                 if (connectionResult.hasResolution()) {
-/*                try {
-                    mResolvingError = true;
-                    //connectionResult.startResolutionForResult(this, REQUEST_RESOLVE_ERROR);
-                } catch (IntentSender.SendIntentException e) {
-                    // There was an error with the resolution intent. Try again.
-                    mGoogleApiClient.connect();
-                }*/
                 } else {
                     Log.e(TAG, "Connection to Google API client has failed");
                     mResolvingError = false;
@@ -186,9 +195,19 @@ public class MyWatchFace extends CanvasWatchFaceService {
             mTextPaint.setTextSize(40);
             mTextPaint.setColor(Color.WHITE);
             mTextPaint.setAntiAlias(true);
+            mTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
+            mTextPaintThin=mTextPaint;
+            mTextPaintThin.setTypeface(Typeface.DEFAULT);
             // In order to make text in the center, we need adjust its position
-            mTextXOffset = mTextPaint.measureText("12:00") / 2;
+            mTextXOffset = mTextPaint.measureText("00"+(char)0x00B0+" ");
             mTextYOffset = (mTextPaint.ascent() + mTextPaint.descent()) / 2;
+
+            // Paint for the Date
+            mTextPaintDate = new Paint();
+            mTextPaintDate.setTextSize(30);
+            mTextPaintDate.setColor(Color.WHITE);
+            mTextPaintDate.setAntiAlias(true);
+            mTextXOffsetDate = mTextPaintDate.measureText("Fri, Jan, 13") / 2;
 
             setWatchFaceStyle(new WatchFaceStyle.Builder(MyWatchFace.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_SHORT)
@@ -204,10 +223,18 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .build();
             mGoogleApiClient.connect();
 
-/*            mHourPaint.setAntiAlias(true);
-            mHourPaint.setShadowLayer(SHADOW_RADIUS, 0, 0, mWatchHandShadowColor);*/
-
-//            mCalendar = Calendar.getInstance();
+            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/sunshine_installed");
+            putDataMapReq.getDataMap().putInt(INSTALLED, new Random().nextInt());
+            PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+            putDataReq.setUrgent();
+            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            Log.d(TAG, "Sending Install Status was successful: " + dataItemResult.getStatus()
+                                    .isSuccess());
+                        }
+                    });
         }
 
         @Override
@@ -239,82 +266,32 @@ public class MyWatchFace extends CanvasWatchFaceService {
             //updateTimer();
         }
 
-/*        @Override
-        public void onInterruptionFilterChanged(int interruptionFilter) {
-            super.onInterruptionFilterChanged(interruptionFilter);
-            boolean inMuteMode = (interruptionFilter == WatchFaceService.INTERRUPTION_FILTER_NONE);
-
-            *//* Dim display in mute mode. *//*
-            if (mMuteMode != inMuteMode) {
-                mMuteMode = inMuteMode;
-                invalidate();
-            }
-        }*/
-
-/*
-        @Override
-        public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            super.onSurfaceChanged(holder, format, width, height);
-
-            */
-/*
-             * Find the coordinates of the center point on the screen, and ignore the window
-             * insets, so that, on round watches with a "chin", the watch face is centered on the
-             * entire screen, not just the usable portion.
-             *//*
-
-            mCenterX = width / 2f;
-            mCenterY = height / 2f;
-
-        }
-*/
-
-        /**
-         * Captures tap event (and tap type). The {@link WatchFaceService#TAP_TYPE_TAP} case can be
-         * used for implementing specific logic to handle the gesture.
-         */
-/*        @Override
-        public void onTapCommand(int tapType, int x, int y, long eventTime) {
-            switch (tapType) {
-                case TAP_TYPE_TOUCH:
-                    // The user has started touching the screen.
-                    break;
-                case TAP_TYPE_TOUCH_CANCEL:
-                    // The user has started a different gesture or otherwise cancelled the tap.
-                    break;
-                case TAP_TYPE_TAP:
-                    // The user has completed the tap gesture.
-                    // TODO: Add code to handle the tap gesture.
-                    Toast.makeText(getApplicationContext(), R.string.message, Toast.LENGTH_SHORT)
-                            .show();
-                    break;
-            }
-            invalidate();
-        }*/
-
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-/*            long now = System.currentTimeMillis();
-            mCalendar.setTimeInMillis(now);*/
-
-            //canvas.drawColor(Color.BLUE);
-
             if (mAmbient) {
                 canvas.drawColor(Color.BLACK);
             } else {
                 canvas.drawColor(Color.BLUE);
                 String max_temp_string= Integer.toString(max_temp);
                 String min_temp_string= Integer.toString(min_temp);
-                canvas.drawText(max_temp_string+(char) 0x00B0+" "+min_temp_string+(char) 0x00B0,
+                canvas.drawText(max_temp_string+(char) 0x00B0,
                         bounds.centerX() - mTextXOffset,
                         bounds.centerY() - mTextYOffset,
                         mTextPaint);
+                canvas.drawText(" "+min_temp_string+(char) 0x00B0,
+                        bounds.centerX(),
+                        bounds.centerY() - mTextYOffset,
+                        mTextPaintThin);
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE, MMM, d");
+                Date d = new Date();
+                String date = sdf.format(d);
+                canvas.drawText(date,bounds.centerX() - mTextXOffsetDate,
+                        bounds.centerY() - mTextYOffset*4,mTextPaintDate);
+                Drawable drawable = MyWatchFace.this.getResources().getDrawable(weather_icon,getTheme());
+                drawable.setBounds(bounds.centerX()-50, bounds.centerY()+100,bounds.centerX()+50 , bounds.centerY()+200);
+                drawable.draw(canvas);
+
             }
-
-/*            canvas.save();
-
-            *//* Restore the canvas' original orientation. *//*
-            canvas.restore();*/
         }
 
         @Override
@@ -331,59 +308,46 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 }
             }
         }
+    }
 
-/*        @Override
-        public void onPeekCardPositionUpdate(Rect rect) {
-            super.onPeekCardPositionUpdate(rect);
-            mPeekCardBounds.set(rect);
-        }
+    public static int getSmallArtResourceIdForWeatherCondition(int weatherId) {
 
-        private void registerReceiver() {
-            if (mRegisteredTimeZoneReceiver) {
-                return;
-            }
-            mRegisteredTimeZoneReceiver = true;
-            IntentFilter filter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
-            MyWatchFace.this.registerReceiver(mTimeZoneReceiver, filter);
-        }
-
-        private void unregisterReceiver() {
-            if (!mRegisteredTimeZoneReceiver) {
-                return;
-            }
-            mRegisteredTimeZoneReceiver = false;
-            MyWatchFace.this.unregisterReceiver(mTimeZoneReceiver);
-        }*/
-
-        /**
-         * Starts/stops the {@link #mUpdateTimeHandler} timer based on the state of the watch face.
+        /*
+         * Based on weather code data for Open Weather Map.
          */
-/*        private void updateTimer() {
-            mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
-            if (shouldTimerBeRunning()) {
-                mUpdateTimeHandler.sendEmptyMessage(MSG_UPDATE_TIME);
-            }
-        }*/
-
-        /**
-         * Returns whether the {@link #mUpdateTimeHandler} timer should be running. The timer
-         * should only run in active mode.
-         */
-/*        private boolean shouldTimerBeRunning() {
-            return isVisible() && !mAmbient;
+        if (weatherId >= 200 && weatherId <= 232) {
+            return com.example.sunshinewatch.R.drawable.ic_storm;
+        } else if (weatherId >= 300 && weatherId <= 321) {
+            return com.example.sunshinewatch.R.drawable.ic_light_rain;
+        } else if (weatherId >= 500 && weatherId <= 504) {
+            int temp=com.example.sunshinewatch.R.drawable.ic_rain;
+            return com.example.sunshinewatch.R.drawable.ic_rain;
+        } else if (weatherId == 511) {
+            return com.example.sunshinewatch.R.drawable.ic_snow;
+        } else if (weatherId >= 520 && weatherId <= 531) {
+            return com.example.sunshinewatch.R.drawable.ic_rain;
+        } else if (weatherId >= 600 && weatherId <= 622) {
+            return com.example.sunshinewatch.R.drawable.ic_snow;
+        } else if (weatherId >= 701 && weatherId <= 761) {
+            return com.example.sunshinewatch.R.drawable.ic_fog;
+        } else if (weatherId == 761 || weatherId == 771 || weatherId == 781) {
+            return com.example.sunshinewatch.R.drawable.ic_storm;
+        } else if (weatherId == 800) {
+            return com.example.sunshinewatch.R.drawable.ic_clear;
+        } else if (weatherId == 801) {
+            return com.example.sunshinewatch.R.drawable.ic_light_clouds;
+        } else if (weatherId >= 802 && weatherId <= 804) {
+            return com.example.sunshinewatch.R.drawable.ic_cloudy;
+        } else if (weatherId >= 900 && weatherId <= 906) {
+            return com.example.sunshinewatch.R.drawable.ic_storm;
+        } else if (weatherId >= 958 && weatherId <= 962) {
+            return com.example.sunshinewatch.R.drawable.ic_storm;
+        } else if (weatherId >= 951 && weatherId <= 957) {
+            return com.example.sunshinewatch.R.drawable.ic_clear;
         }
-
-        *//**
-         * Handle updating the time periodically in interactive mode.
-         *//*
-        private void handleUpdateTimeMessage() {
-            invalidate();
-            if (shouldTimerBeRunning()) {
-                long timeMs = System.currentTimeMillis();
-                long delayMs = INTERACTIVE_UPDATE_RATE_MS
-                        - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
-                mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
-            }
-        }*/
+        else {
+            Log.e(TAG, "Unknown Weather: " + weatherId);
+            return com.example.sunshinewatch.R.drawable.ic_storm;
+        }
     }
 }

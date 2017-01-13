@@ -32,13 +32,16 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.net.URL;
 
-public class SunshineSyncTask {
+public class SunshineSyncTask implements DataApi.DataListener{
 
     /*implements
     DataApi.DataListener,
@@ -58,11 +61,14 @@ public class SunshineSyncTask {
     private static final String MIN_TEMP = "com.example.android.sunshine.key.min_temp";
     private static final String CURRENT_TIME= "com.example.android.sunshine.key.time";
     private static final String TAG = "Sync Task";
+    private static final String WEATHER_ID = "com.example.android.sunshine.key.weather_id";
     //private static final int REQUEST_RESOLVE_ERROR = 1000;
     private static boolean mResolvingError = false;
     private static GoogleApiClient mGoogleApiClient;
+    private static Context mContext;
 
-    synchronized static public void syncWeather (Context context) {
+    synchronized static public void syncWeather(Context context) {
+        mContext=context;
 
         try {
             /*
@@ -81,6 +87,7 @@ public class SunshineSyncTask {
 
             double max_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP);
             double min_temp = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_MIN_TEMP);
+            int weather_id = weatherValues[0].getAsInteger(WeatherContract.WeatherEntry.COLUMN_WEATHER_ID);
             double max_temp_correct_units;
             double min_temp_correct_units;
             if (!SunshinePreferences.isMetric(context)) {
@@ -141,6 +148,7 @@ public class SunshineSyncTask {
                     NotificationUtils.notifyUserOfNewWeather(context);
                 }
 
+                final SunshineSyncTask sync_instance = new SunshineSyncTask();
             /* If the code reaches this point, we have successfully performed our sync */
                 mGoogleApiClient = new GoogleApiClient.Builder(context)
                         .addApi(Wearable.API)
@@ -150,6 +158,8 @@ public class SunshineSyncTask {
                                 Log.d(TAG, "onConnected: " + connectionHint);
                                 mResolvingError = false;
                                 // Now you can use the Data Layer API
+                                Wearable.DataApi.addListener(mGoogleApiClient,sync_instance);
+                                //sync_instance.addListener(mGoogleApiClient);
                             }
                             @Override
                             public void onConnectionSuspended ( int cause){
@@ -172,7 +182,9 @@ public class SunshineSyncTask {
                                     } else {
                                         Log.e(TAG, "Connection to Google API client has failed");
                                         mResolvingError = false;
-                                        //Wearable.DataApi.removeListener(mGoogleApiClient, this);
+                                        //SunshineSyncTask sync_instance = new SunshineSyncTask();
+                                        Wearable.DataApi.removeListener(mGoogleApiClient,sync_instance);
+                                        //sync_instance.removeListener(mGoogleApiClient);
                                     }
                                 }
 
@@ -186,6 +198,7 @@ public class SunshineSyncTask {
                 PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/weather_info");
                 putDataMapReq.getDataMap().putInt(MAX_TEMP, (int) max_temp_correct_units);
                 putDataMapReq.getDataMap().putInt(MIN_TEMP, (int) min_temp_correct_units);
+                putDataMapReq.getDataMap().putInt(WEATHER_ID, weather_id);
                 putDataMapReq.getDataMap().putLong(CURRENT_TIME, System.currentTimeMillis());
                 PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
                 putDataReq.setUrgent();
@@ -203,6 +216,21 @@ public class SunshineSyncTask {
         } catch (Exception e) {
             /* Server probably invalid */
             e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onDataChanged(DataEventBuffer dataEvents) {
+        for (DataEvent event : dataEvents) {
+            if (event.getType() == DataEvent.TYPE_DELETED) {
+                Log.d(TAG, "DataItem deleted: " + event.getDataItem().getUri());
+            } else if (event.getType() == DataEvent.TYPE_CHANGED) {
+                Log.d(TAG, "DataItem changed: " + event.getDataItem().getUri());
+                DataItem item = event.getDataItem();
+                if (item.getUri().getPath().compareTo("/sunshine_installed") == 0) {
+                    syncWeather(mContext);
+                }
+            }
         }
     }
 }
