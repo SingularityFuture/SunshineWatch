@@ -145,6 +145,19 @@ public class MyWatchFace extends CanvasWatchFaceService {
         public void onConnected(@Nullable Bundle bundle) {
             mResolvingError = false;
             Wearable.DataApi.addListener(mGoogleApiClient, this);
+
+            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/sunshine_installed");
+            putDataMapReq.getDataMap().putInt(INSTALLED, new Random().nextInt());
+            PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+            putDataReq.setUrgent();
+            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            Log.d(TAG, "Sending Install Status was successful: " + dataItemResult.getStatus()
+                                    .isSuccess());
+                        }
+                    });
         }
 
         @Override
@@ -223,7 +236,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .build();
             mGoogleApiClient.connect();
 
-            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/sunshine_installed");
+/*            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/sunshine_installed");
             putDataMapReq.getDataMap().putInt(INSTALLED, new Random().nextInt());
             PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
             putDataReq.setUrgent();
@@ -234,7 +247,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
                             Log.d(TAG, "Sending Install Status was successful: " + dataItemResult.getStatus()
                                     .isSuccess());
                         }
-                    });
+                    });*/
         }
 
         @Override
@@ -288,7 +301,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 canvas.drawText(date,bounds.centerX() - mTextXOffsetDate,
                         bounds.centerY() - mTextYOffset*4,mTextPaintDate);
                 Drawable drawable = MyWatchFace.this.getResources().getDrawable(weather_icon,getTheme());
-                drawable.setBounds(bounds.centerX()-50, bounds.centerY()+100,bounds.centerX()+50 , bounds.centerY()+200);
+                drawable.setBounds(bounds.centerX()-25, bounds.centerY()+55,bounds.centerX()+25 , bounds.centerY()+105);
                 drawable.draw(canvas);
 
             }

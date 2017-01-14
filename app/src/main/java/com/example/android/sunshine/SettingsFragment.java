@@ -102,6 +102,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         } else if (key.equals(getString(R.string.pref_units_key))) {
             // units have changed. update lists of weather entries accordingly
             activity.getContentResolver().notifyChange(WeatherContract.WeatherEntry.CONTENT_URI, null);
+            SunshineSyncUtils.startImmediateSync(activity);
         }
         Preference preference = findPreference(key);
         if (null != preference) {
