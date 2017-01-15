@@ -235,19 +235,6 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .addOnConnectionFailedListener(this)
                     .build();
             mGoogleApiClient.connect();
-
-/*            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/sunshine_installed");
-            putDataMapReq.getDataMap().putInt(INSTALLED, new Random().nextInt());
-            PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
-            putDataReq.setUrgent();
-            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
-                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-                        @Override
-                        public void onResult(DataApi.DataItemResult dataItemResult) {
-                            Log.d(TAG, "Sending Install Status was successful: " + dataItemResult.getStatus()
-                                    .isSuccess());
-                        }
-                    });*/
         }
 
         @Override
